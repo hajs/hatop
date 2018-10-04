@@ -376,7 +376,7 @@ class Socket:
         data = self._socket.recv(HAPROXY_CLI_BUFSIZE)
         if not data:
             raise SocketError('error while waiting for prompt')
-        return data
+        return data.decode()
 
     def connect(self):
         # Initialize socket connection
@@ -390,16 +390,16 @@ class Socket:
         # Enter the interactive socket mode. This requires HAProxy 1.4+ and
         # allows us to error out early if connected to an older version.
         try:
-            self.send('prompt')
+            self.send(b'prompt')
             self.wait()
-            self.send('set timeout cli %d' % HAPROXY_CLI_TIMEOUT)
+            self.send(b'set timeout cli %d' % HAPROXY_CLI_TIMEOUT)
             self.wait()
         except SocketError:
             raise SocketError('error while initializing interactive mode')
 
     def close(self):
         try:
-            self.send('quit')
+            self.send(b'quit')
         except:
             pass
         try:
@@ -408,7 +408,7 @@ class Socket:
             pass
 
     def send(self, cmdline):
-        self._socket.sendall('%s\n' % cmdline)
+        self._socket.sendall(b'%s\n' % cmdline)
 
     def wait(self):
         # Wait for the prompt and discard data.
@@ -471,7 +471,7 @@ class SocketData:
                 raise ValueError('invalid proxy filter: %s' % filter)
 
         # Convert proxy filters into more efficient stat filters
-        self.socket.send('show stat')
+        self.socket.send(b'show stat')
         pxstat, pxcount, svcount = parse_stat(self.socket.recv())
 
         proxy_iid_map = {} # {pxname: iid, ...}
@@ -494,7 +494,7 @@ class SocketData:
             self._filters.add((iid, -1, -1))
 
     def update_info(self):
-        self.socket.send('show info')
+        self.socket.send(b'show info')
         iterable = self.socket.recv()
         self.info = parse_info(iterable)
 
@@ -511,7 +511,7 @@ class SocketData:
 
         if self._filters:
             for filter in self._filters:
-                self.socket.send('show stat %d %d %d' % filter)
+                self.socket.send(b'show stat %d %d %d' % filter)
                 filter_stat, filter_pxcount, filter_svcount = \
                         parse_stat(self.socket.recv())
 
@@ -522,7 +522,7 @@ class SocketData:
                 self.svcount += filter_svcount
                 self.stat.update(filter_stat)
         else:
-            self.socket.send('show stat')
+            self.socket.send(b'show stat')
             self.stat, self.pxcount, self.svcount = \
                     parse_stat(self.socket.recv())
 
@@ -830,7 +830,7 @@ class ScreenCLI:
     def execute_cmdline(self, cmdline):
         self.obuf.append('* %s' % time.ctime())
         self.obuf.append('> %s' % cmdline)
-        self.screen.data.socket.send(cmdline)
+        self.screen.data.socket.send(cmdline.encode())
         self.obuf.extend(self.screen.data.socket.recv())
         self.update_screenlines()
 
@@ -1684,7 +1684,7 @@ def get_width(width, xmax, ncols, idx):
         else:
             if idx < (xdiff - (xdiff / ncols) * ncols):
                 width += 1 # compensate rounding
-            width = width + xdiff / ncols
+            width = width + xdiff // ncols
     return width
 
 def get_cell(width, align, value):
